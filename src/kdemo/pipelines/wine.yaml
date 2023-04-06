@@ -1,0 +1,468 @@
+# PIPELINE DEFINITION
+# Name: wine-classification
+# Description: Predict the type of wine from its measurements.
+# Inputs:
+#    n_neighbors: int
+#    random_state: int
+#    test_size: float
+# Outputs:
+#    Output: system.Model
+components:
+  comp-create-model:
+    executorLabel: exec-create-model
+    inputDefinitions:
+      parameters:
+        n_neighbors:
+          parameterType: NUMBER_INTEGER
+    outputDefinitions:
+      artifacts:
+        output_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+  comp-evaluate-model:
+    executorLabel: exec-evaluate-model
+    inputDefinitions:
+      artifacts:
+        input_data_test:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        input_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+        input_target_test:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: NUMBER_DOUBLE
+  comp-load-data-target:
+    executorLabel: exec-load-data-target
+    outputDefinitions:
+      artifacts:
+        output_data:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        output_target:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        data_shape:
+          parameterType: LIST
+        target_shape:
+          parameterType: LIST
+  comp-split-data-target:
+    executorLabel: exec-split-data-target
+    inputDefinitions:
+      artifacts:
+        input_data:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        input_target:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+      parameters:
+        random_state:
+          parameterType: NUMBER_INTEGER
+        test_size:
+          parameterType: NUMBER_DOUBLE
+    outputDefinitions:
+      artifacts:
+        output_data_test:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        output_data_train:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        output_target_test:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        output_target_train:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+  comp-train-model:
+    executorLabel: exec-train-model
+    inputDefinitions:
+      artifacts:
+        input_data_train:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+        input_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+        input_target_train:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      artifacts:
+        output_model:
+          artifactType:
+            schemaTitle: system.Model
+            schemaVersion: 0.0.1
+  comp-validate-data:
+    executorLabel: exec-validate-data
+    inputDefinitions:
+      artifacts:
+        input_data:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+    outputDefinitions:
+      artifacts:
+        output_stats:
+          artifactType:
+            schemaTitle: system.Dataset
+            schemaVersion: 0.0.1
+deploymentSpec:
+  executors:
+    exec-create-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - create_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet     --no-warn-script-location 'joblib'\
+          \ 'scikit-learn' 'kfp==2.0.0-beta.13' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          python3 -m kfp.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef create_model(\n    output_model: dsl.Output[dsl.Model],\n   \
+          \ n_neighbors: int,\n):\n    \"\"\"Create a model (including a scaler and\
+          \ classifier).\"\"\"\n    import joblib as jl\n    from sklearn import pipeline,\
+          \ preprocessing, neighbors\n\n    classifier = neighbors.KNeighborsClassifier(n_neighbors=n_neighbors)\n\
+          \    scaler = preprocessing.StandardScaler()\n    steps = [\n        (\"\
+          scaler\", scaler),\n        (\"classifier\", classifier),\n    ]\n    model\
+          \ = pipeline.Pipeline(steps)\n    jl.dump(model, output_model.path)\n\n"
+        image: python:3.7
+    exec-evaluate-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - evaluate_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet     --no-warn-script-location 'pandas'\
+          \ 'scikit-learn' 'kfp==2.0.0-beta.13' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          python3 -m kfp.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef evaluate_model(\n    input_model: dsl.Input[dsl.Model],\n   \
+          \ input_data_test: dsl.Input[dsl.Dataset],\n    input_target_test: dsl.Input[dsl.Dataset],\n\
+          ) -> float:\n    \"\"\"Evaluate the model on the test data.\"\"\"\n    import\
+          \ joblib as jl\n    import pandas as pd\n\n    model = jl.load(input_model.path)\n\
+          \    data_test = pd.read_csv(input_data_test.path)\n    target_test = pd.read_csv(input_target_test.path)\n\
+          \    score = model.score(data_test, target_test)\n\n    return float(score)\n\
+          \n"
+        image: python:3.7
+    exec-load-data-target:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - load_data_target
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet     --no-warn-script-location 'pandas'\
+          \ 'scikit-learn' 'kfp==2.0.0-beta.13' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          python3 -m kfp.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef load_data_target(\n    output_data: dsl.Output[dsl.Dataset],\n\
+          \    output_target: dsl.Output[dsl.Dataset],\n) -> NamedTuple(\"Outputs\"\
+          , [(\"data_shape\", List[int]), (\"target_shape\", List[int])]):\n    \"\
+          \"\"Load the wine datasets from sklearn.\"\"\"\n    from sklearn import\
+          \ datasets\n    from typing import NamedTuple, List\n\n    data, target\
+          \ = datasets.load_wine(return_X_y=True, as_frame=True)\n    data.to_csv(output_data.path,\
+          \ index=False)\n    target.to_csv(output_target.path, index=False)\n   \
+          \ # this verbose structure is required, as explained in the documentation:\n\
+          \    # https://www.kubeflow.org/docs/components/pipelines/v2/author-a-pipeline/component-io/#python-components\n\
+          \    output = NamedTuple(\n        \"Outputs\",\n        [\n           \
+          \ (\"data_shape\", List[int]),\n            (\"target_shape\", List[int]),\n\
+          \        ],\n    )\n    # kubeflow doesn't support tuples -> cast to list\n\
+          \    return output(list(data.shape), list(target.shape))\n\n"
+        image: python:3.7
+    exec-split-data-target:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - split_data_target
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet     --no-warn-script-location 'pandas'\
+          \ 'scikit-learn' 'kfp==2.0.0-beta.13' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          python3 -m kfp.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef split_data_target(\n    input_data: dsl.Input[dsl.Dataset],\n\
+          \    input_target: dsl.Input[dsl.Dataset],\n    output_data_train: dsl.Output[dsl.Dataset],\n\
+          \    output_target_train: dsl.Output[dsl.Dataset],\n    output_data_test:\
+          \ dsl.Output[dsl.Dataset],\n    output_target_test: dsl.Output[dsl.Dataset],\n\
+          \    test_size: float,\n    random_state: int,\n):\n    \"\"\"Split the\
+          \ data and target into train and test sets.\"\"\"\n    import pandas as\
+          \ pd\n    from sklearn import model_selection\n\n    data = pd.read_csv(input_data.path)\n\
+          \    target = pd.read_csv(input_target.path)\n    data_train, data_test,\
+          \ target_train, target_test = model_selection.train_test_split(\n      \
+          \  data,\n        target,\n        test_size=test_size,\n        random_state=random_state,\n\
+          \    )\n    data_test.to_csv(output_data_test.path, index=False)\n    data_train.to_csv(output_data_train.path,\
+          \ index=False)\n    target_test.to_csv(output_target_test.path, index=False)\n\
+          \    target_train.to_csv(output_target_train.path, index=False)\n\n"
+        image: python:3.7
+    exec-train-model:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - train_model
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet     --no-warn-script-location 'joblib'\
+          \ 'pandas' 'scikit-learn' 'kfp==2.0.0-beta.13' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          python3 -m kfp.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef train_model(\n    input_model: dsl.Input[dsl.Model],\n    input_data_train:\
+          \ dsl.Input[dsl.Dataset],\n    input_target_train: dsl.Input[dsl.Dataset],\n\
+          \    output_model: dsl.Output[dsl.Model],\n):\n    \"\"\"Fit the model to\
+          \ the training data.\"\"\"\n    import joblib as jl\n    import pandas as\
+          \ pd\n\n    model = jl.load(input_model.path)\n    data_train = pd.read_csv(input_data_train.path)\n\
+          \    target_train = pd.read_csv(input_target_train.path)\n    model.fit(data_train,\
+          \ target_train)\n    jl.dump(model, output_model.path)\n\n"
+        image: python:3.7
+    exec-validate-data:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - validate_data
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet     --no-warn-script-location 'pandas'\
+          \ 'kfp==2.0.0-beta.13' && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          python3 -m kfp.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef validate_data(\n    input_data: dsl.Input[dsl.Dataset], output_stats:\
+          \ dsl.Output[dsl.Dataset]\n):\n    \"\"\"Validate the data and report its\
+          \ statistics.\"\"\"\n    import pandas as pd\n\n    data = pd.read_csv(input_data.path)\n\
+          \    stats = data.describe(include=\"all\")\n    stats.to_csv(output_stats.path,\
+          \ index=False)\n    assert data.shape[1] == 13, \"Data should have 13 columns!\"\
+          \n    assert data.isnull().sum().sum() == 0, \"Data contains null values!\"\
+          \n\n"
+        image: python:3.7
+pipelineInfo:
+  name: wine-classification
+root:
+  dag:
+    outputs:
+      artifacts:
+        Output:
+          artifactSelectors:
+          - outputArtifactKey: output_model
+            producerSubtask: train-model
+    tasks:
+      create-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-create-model
+        inputs:
+          parameters:
+            n_neighbors:
+              componentInputParameter: n_neighbors
+        taskInfo:
+          name: create-model
+      evaluate-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-evaluate-model
+        dependentTasks:
+        - split-data-target
+        - train-model
+        inputs:
+          artifacts:
+            input_data_test:
+              taskOutputArtifact:
+                outputArtifactKey: output_data_test
+                producerTask: split-data-target
+            input_model:
+              taskOutputArtifact:
+                outputArtifactKey: output_model
+                producerTask: train-model
+            input_target_test:
+              taskOutputArtifact:
+                outputArtifactKey: output_target_test
+                producerTask: split-data-target
+        taskInfo:
+          name: evaluate-model
+      load-data-target:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-load-data-target
+        taskInfo:
+          name: load-data-target
+      split-data-target:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-split-data-target
+        dependentTasks:
+        - load-data-target
+        inputs:
+          artifacts:
+            input_data:
+              taskOutputArtifact:
+                outputArtifactKey: output_data
+                producerTask: load-data-target
+            input_target:
+              taskOutputArtifact:
+                outputArtifactKey: output_target
+                producerTask: load-data-target
+          parameters:
+            random_state:
+              componentInputParameter: random_state
+            test_size:
+              componentInputParameter: test_size
+        taskInfo:
+          name: split-data-target
+      train-model:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-train-model
+        dependentTasks:
+        - create-model
+        - split-data-target
+        inputs:
+          artifacts:
+            input_data_train:
+              taskOutputArtifact:
+                outputArtifactKey: output_data_train
+                producerTask: split-data-target
+            input_model:
+              taskOutputArtifact:
+                outputArtifactKey: output_model
+                producerTask: create-model
+            input_target_train:
+              taskOutputArtifact:
+                outputArtifactKey: output_target_train
+                producerTask: split-data-target
+        taskInfo:
+          name: train-model
+      validate-data:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-validate-data
+        dependentTasks:
+        - load-data-target
+        inputs:
+          artifacts:
+            input_data:
+              taskOutputArtifact:
+                outputArtifactKey: output_data
+                producerTask: load-data-target
+        taskInfo:
+          name: validate-data
+  inputDefinitions:
+    parameters:
+      n_neighbors:
+        parameterType: NUMBER_INTEGER
+      random_state:
+        parameterType: NUMBER_INTEGER
+      test_size:
+        parameterType: NUMBER_DOUBLE
+  outputDefinitions:
+    artifacts:
+      Output:
+        artifactType:
+          schemaTitle: system.Model
+          schemaVersion: 0.0.1
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.0.0-beta.13

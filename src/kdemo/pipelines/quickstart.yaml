@@ -1,0 +1,132 @@
+# PIPELINE DEFINITION
+# Name: addition-pipeline
+# Inputs:
+#    a: int
+#    b: int
+#    c: int
+components:
+  comp-addition-component:
+    executorLabel: exec-addition-component
+    inputDefinitions:
+      parameters:
+        num1:
+          parameterType: NUMBER_INTEGER
+        num2:
+          parameterType: NUMBER_INTEGER
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: NUMBER_INTEGER
+  comp-addition-component-2:
+    executorLabel: exec-addition-component-2
+    inputDefinitions:
+      parameters:
+        num1:
+          parameterType: NUMBER_INTEGER
+        num2:
+          parameterType: NUMBER_INTEGER
+    outputDefinitions:
+      parameters:
+        Output:
+          parameterType: NUMBER_INTEGER
+deploymentSpec:
+  executors:
+    exec-addition-component:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - addition_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet     --no-warn-script-location 'kfp==2.0.0-beta.13'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          python3 -m kfp.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef addition_component(num1: int, num2: int) -> int:\n    return\
+          \ num1 + num2\n\n"
+        image: python:3.7
+    exec-addition-component-2:
+      container:
+        args:
+        - --executor_input
+        - '{{$}}'
+        - --function_to_execute
+        - addition_component
+        command:
+        - sh
+        - -c
+        - "\nif ! [ -x \"$(command -v pip)\" ]; then\n    python3 -m ensurepip ||\
+          \ python3 -m ensurepip --user || apt-get install python3-pip\nfi\n\nPIP_DISABLE_PIP_VERSION_CHECK=1\
+          \ python3 -m pip install --quiet     --no-warn-script-location 'kfp==2.0.0-beta.13'\
+          \ && \"$0\" \"$@\"\n"
+        - sh
+        - -ec
+        - 'program_path=$(mktemp -d)
+
+          printf "%s" "$0" > "$program_path/ephemeral_component.py"
+
+          python3 -m kfp.components.executor_main                         --component_module_path                         "$program_path/ephemeral_component.py"                         "$@"
+
+          '
+        - "\nimport kfp\nfrom kfp import dsl\nfrom kfp.dsl import *\nfrom typing import\
+          \ *\n\ndef addition_component(num1: int, num2: int) -> int:\n    return\
+          \ num1 + num2\n\n"
+        image: python:3.7
+pipelineInfo:
+  name: addition-pipeline
+root:
+  dag:
+    tasks:
+      addition-component:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-addition-component
+        inputs:
+          parameters:
+            num1:
+              componentInputParameter: a
+            num2:
+              componentInputParameter: b
+        taskInfo:
+          name: addition-component
+      addition-component-2:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-addition-component-2
+        dependentTasks:
+        - addition-component
+        inputs:
+          parameters:
+            num1:
+              taskOutputParameter:
+                outputParameterKey: Output
+                producerTask: addition-component
+            num2:
+              componentInputParameter: c
+        taskInfo:
+          name: addition-component-2
+  inputDefinitions:
+    parameters:
+      a:
+        parameterType: NUMBER_INTEGER
+      b:
+        parameterType: NUMBER_INTEGER
+      c:
+        parameterType: NUMBER_INTEGER
+schemaVersion: 2.1.0
+sdkVersion: kfp-2.0.0-beta.13
