@@ -29,6 +29,16 @@ components:
       parameters:
         Output:
           parameterType: NUMBER_INTEGER
+  comp-say-hello:
+    executorLabel: exec-say-hello
+    inputDefinitions:
+      parameters:
+        a:
+          parameterType: NUMBER_INTEGER
+        b:
+          parameterType: NUMBER_INTEGER
+        c:
+          parameterType: NUMBER_INTEGER
 deploymentSpec:
   executors:
     exec-addition-component:
@@ -85,6 +95,13 @@ deploymentSpec:
           \ *\n\ndef addition_component(num1: int, num2: int) -> int:\n    return\
           \ num1 + num2\n\n"
         image: python:3.7
+    exec-say-hello:
+      container:
+        args:
+        - Hello a={{$.inputs.parameters['a']}}, b={{$.inputs.parameters['b']}}, c={{$.inputs.parameters['c']}}
+        command:
+        - echo
+        image: alpine
 pipelineInfo:
   name: addition-pipeline
 root:
@@ -120,6 +137,21 @@ root:
               componentInputParameter: c
         taskInfo:
           name: addition-component-2
+      say-hello:
+        cachingOptions:
+          enableCache: true
+        componentRef:
+          name: comp-say-hello
+        inputs:
+          parameters:
+            a:
+              componentInputParameter: a
+            b:
+              componentInputParameter: b
+            c:
+              componentInputParameter: c
+        taskInfo:
+          name: say-hello
   inputDefinitions:
     parameters:
       a:

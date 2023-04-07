@@ -22,10 +22,15 @@ compiler = kfp.compiler.Compiler()
 def addition_component(num1: int, num2: int) -> int:
     return num1 + num2
 
+@kfp.dsl.container_component
+def say_hello(a: int, b: int, c: int):
+    return kfp.dsl.ContainerSpec(image='alpine', command=['echo'], args=[f'Hello a={a}, b={b}, c={c}'])
+
 # %% PIPELINES
 
 @kfp.dsl.pipeline(name="addition-pipeline")
 def my_pipeline(a: int, b: int, c: int):
+    say_hello(a=a, b=b, c=c)
     add_task_1 = addition_component(num1=a, num2=b)
     add_task_2 = addition_component(num1=add_task_1.output, num2=c)
 
