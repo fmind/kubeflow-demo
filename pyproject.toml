@@ -3,7 +3,7 @@
 [tool.poetry]
 name = "kdemo"
 version = "0.1.0"
-description = "Kubeflow demo for the MLOps Community Meetup at Luxembourg"
+description = "Kubeflow demo for the MLOps Community Meetup at Luxembourg."
 authors = ["Médéric Hurier (Fmind) <mederic.hurier@fmind.dev>"]
 repository = "https://github.com/fmind/kubeflow-demo"
 readme = "README.md"
