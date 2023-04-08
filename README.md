@@ -22,7 +22,7 @@ inv install
 # apply Kubeflow Pipelines manifests
 inv apply
 # setup port forward for the Kubeflow UI
-inv ui
+inv serve
 ```
 
 Remember to activate the Virtual Environment before accessing the project:
