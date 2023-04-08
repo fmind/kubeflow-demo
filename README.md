@@ -4,8 +4,9 @@ Kubeflow demo for the MLOps Community Meetup at Luxembourg.
 
 # Requirements
 
-- [python3](https://www.python.org/)
-- [pyinvoke](https://www.pyinvoke.org/)
+- [Python](https://www.python.org/)
+- [PyInvoke](https://www.pyinvoke.org/)
+- [Poetry](https://python-poetry.org/)
 - [protobuf](https://developers.google.com/protocol-buffers/docs/overview)
 - [Kubeflow Pipelines](https://kubeflow.org/)
 
